@@ -1,0 +1,349 @@
+---
+title: "Plant ecology write-up"
+author: "Tiffene Larose"
+date: '2024-04-02'
+output: html_document
+---
+
+```{r}
+library(dplyr)
+setwd("/Users/larost1/Desktop/Kew Practical write-up")
+alldata <- read.csv("/Users/larost1/Desktop/Kew Practical write-up/processeddata.csv")
+
+######################
+
+names(alldata)
+# List of valid regions
+valid_regions <- c("New Zealand", "Africa", "Asia", "Australia", "Asia", "Western Australia", "Himalayas", "Americas")
+
+# Check for rows with invalid regions
+invalid_rows <- which(!alldata$Region %in% valid_regions)
+# Extract rows with invalid regions
+invalid_data <- alldata[invalid_rows, ]
+print(invalid_data)
+
+
+# Assuming 'alldata' is your dataframe
+alldata <- alldata %>%
+  group_by(Family) %>%
+  mutate(Unique_Regions = n_distinct(Region)) %>%
+  ungroup()
+
+print(alldata)
+
+#GLMM tests
+
+########## line number of regions
+lmer_num <- lmer(Unique_Regions ~ Length + Width + Serrated + Hairy + Waxy + Compound + Central + (1|Group) + (1|GenusSpecies), data=alldata)
+#deleting serrated
+lmer_num1 <- lmer(Unique_Regions ~ Length + Width + Hairy + Waxy + Compound + Central + (1|Group) + (1|GenusSpecies), data=alldata)
+#deleting serrated + compound
+lmer_num2 <- lmer(Unique_Regions ~ Length + Width + Hairy + Waxy + Central + (1|Group) + (1|GenusSpecies), data=alldata)
+#deleting serrated + compound + waxy
+lmer_num3 <- lmer(Unique_Regions ~ Length + Width + Hairy + Central + (1|Group) + (1|GenusSpecies), data=alldata)
+#deleting serrated + compound + waxy + width
+lmer_num4<- lmer(Unique_Regions ~ Length + Hairy + Central + (1|Group) + (1|GenusSpecies), data=alldata)
+#deleting serrated + compound + waxy + width + Central
+lmer_num5<- lmer(Unique_Regions ~ Length + Hairy + (1|Group) + (1|GenusSpecies), data=alldata)
+
+summary(lmer_num)
+summary(lmer_num5)
+
+AIC(lmer_num, lmer_num1, lmer_num2, lmer_num3, lmer_num4, lmer_num5)
+BIC(lmer_num, lmer_num1, lmer_num2, lmer_num3, lmer_num4, lmer_num5)
+
+#lmer_line10 has the lowest AIC score
+
+
+library(ggplot2)
+
+# Assuming "alldata" is your dataframe, adjust column names accordingly if needed
+# Assuming "Unique_Regions" is a factor variable representing different temperate regions
+
+
+ggplot(alldata, aes(x = Unique_Regions)) +
+  geom_point(aes(y = Length), color = "turquoise3", alpha = 0.3) +  # Scatter plot of "length" against "Unique_Regions"
+  geom_point(aes(y = Width), color = "salmon", alpha = 0.3) +    # Scatter plot of "width" against "Unique_Regions"
+  geom_smooth(aes(y = Length), method = "lm", se = FALSE, color = "turquoise3", linetype = "dashed") +  # Add trend line for "length"
+  geom_smooth(aes(y = Width), method = "lm", se = FALSE, color = "salmon", linetype = "dashed") +     # Add trend line for "width"
+  geom_ribbon(aes(ymin = predict(lm(Length ~ Unique_Regions, data = alldata), interval = "confidence")[,2],
+                ymax = predict(lm(Length ~ Unique_Regions, data = alldata), interval = "confidence")[,3]),
+              fill = "turquoise3", alpha = 0.2) +  # Add shaded region for 95% confidence interval of "length"
+  geom_ribbon(aes(ymin = predict(lm(Width ~ Unique_Regions, data = alldata), interval = "confidence")[,2],
+                ymax = predict(lm(Width ~ Unique_Regions, data = alldata), interval = "confidence")[,3]),
+              fill = "salmon", alpha = 0.2) +    # Add shaded region for 95% confidence interval of "width"
+  labs(x = "Number of Unique Regions", y = "Size (mm)") +            # Set axis labels
+  ggtitle("Length and Width across Unique Regions") +  # Set plot title
+  theme_minimal() + # Set the plot theme
+  theme(legend.position = "top")  # Position the legend at the top
+
+
+###adding legend
+ggplot(alldata, aes(x = Unique_Regions)) +
+  geom_point(aes(y = Length), color = "turquoise3", alpha = 0.6) +  # Scatter plot of "Length" against "Unique_Regions"
+  geom_point(aes(y = Width), color = "salmon", alpha = 0.6) +    # Scatter plot of "Width" against "Unique_Regions"
+  geom_smooth(aes(y = Length), method = "lm", se = TRUE, color = "turquoise3", linetype = "dashed", fill = "lightblue") +  # Add trend line with confidence interval for "Length"
+  geom_smooth(aes(y = Width), method = "lm", se = TRUE, color = "salmon", linetype = "dashed", fill = "pink") +     # Add trend line with confidence interval for "Width"
+  labs(x = "Unique Regions", y = "Measurements") +            # Set axis labels
+  ggtitle("Length and Width Measurements across Unique Regions") +  # Set plot title
+  scale_y_continuous(limits = c(0, max(alldata$Length, alldata$Width) * 1.1)) +  # Set y-axis limits starting from 0 and extending to slightly above the maximum value in the dataset
+  theme_minimal() +  # Set the plot theme
+  theme(legend.position = "top", legend.title = element_blank())  # Add legend at the top-right corner
+
+
+ggplot(alldata, aes(x = Unique_Regions)) +
+  geom_point(aes(y = Length, color = "Length"), alpha = 0.6) +  # Scatter plot of "Length" against "Unique_Regions"
+  geom_point(aes(y = Width, color = "Width"), alpha = 0.6) +    # Scatter plot of "Width" against "Unique_Regions"
+  geom_smooth(aes(y = Length, color = "Length"), method = "lm", se = TRUE, linetype = "longdash", fill = "lightblue", size = 0.5) +  # Add trend line with confidence interval for "Length"
+  geom_smooth(aes(y = Width, color = "Width"), method = "lm", se = TRUE, linetype = "longdash", fill = "pink", size = 0.5) +     # Add trend line with confidence interval for "Width"
+  labs(x = "Number of Unique Regions", y = "Size (mm)") +            # Set axis labels and legend title
+  scale_color_manual(values = c("turquoise3", "salmon"), labels = c("Length", "Width")) +  # Set custom colors and labels for legend
+  theme_minimal() +  # Set the plot theme
+  theme(legend.position = "bottom", legend.title = element_blank()) 
+
+library(dplyr)
+
+# Assuming "alldata" is your dataframe containing the columns "Length", "Width", and "Region"
+
+# Compute mean Length and Width for each region
+mean_length_width <- alldata %>%
+  group_by(Region) %>%
+  summarize(mean_length = mean(Length, na.rm = TRUE),
+            mean_width = mean(Width, na.rm = TRUE))
+
+# View the resulting dataframe
+print(mean_length_width)
+
+median_length_width <- alldata %>%
+  group_by(Region) %>%
+  summarize(median_length = median(Length, na.rm = TRUE),
+            median_width = median(Width, na.rm = TRUE))
+
+# View the resulting dataframe
+print(median_length_width)
+
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+alldata$Family <- gsub("\\s+", "", alldata$Family)
+
+#Aim 1: are families non-randomly distributed - chi squared test
+family_counts <- alldata %>%
+  group_by(Family, Region) %>%
+  summarize(count = n()) %>%
+  ungroup() %>%
+  pivot_wider(names_from = Region, values_from = count, values_fill = 0)
+family_counts <- family_counts %>%
+  group_by(Family) %>%
+  summarize(across(everything(), sum))
+
+print(family_counts)
+
+family_counts[, -1] <- lapply(family_counts[, -1], function(x) ifelse(x > 1, 1, x))
+print(family_counts)
+
+
+# Calculate row and col totals (excluding the first column)
+row_totals <- rowSums(family_counts[, -1])
+col_totals <- colSums(family_counts[-1])
+grand_total <- sum(row_totals)
+
+# Compute expected values
+expected_values <- matrix(rep(0, (nrow(family_counts) - 1) * (ncol(family_counts) - 1)), 
+                          nrow = nrow(family_counts) - 1,
+                          ncol = ncol(family_counts) - 1)
+for (i in 1:(nrow(family_counts) - 1)) {
+  for (j in 1:(ncol(family_counts) - 1)) {
+    expected_values[i, j] <- (row_totals[i] * col_totals[j]) / grand_total
+  }
+}
+
+# View the expected values table
+print(expected_values)
+
+##Chi squared test
+observed_matrix <- as.matrix(family_counts[, -1])  # Exclude the first column (family names)
+expected_matrix <- as.matrix(expected_values)
+
+# Perform chi-squared test
+chi_squared_result <- chisq.test(observed_matrix, p = expected_matrix)
+
+# Print the chi-squared test result
+print(chi_squared_result)
+
+
+family_total <- family_counts
+family_total[, -1] <- lapply(family_counts[, -1], function(x) ifelse(x > 1, 1, x))
+print(family_total)
+
+
+row_sums <- rowSums(family_total[, -1])  # Exclude the first column (family names)
+# Create a new dataframe containing the row sums
+row_sums_table <- data.frame(Family = family_total$Family, Row_Sum = row_sums)
+
+# Add a column with all values equal to 1
+row_sums_table$Constant_Column <- rep(1, nrow(row_sums_table))
+
+# Perform paired t-test
+t_test_result <- t.test(row_sums_table$Row_Sum, row_sums_table$Constant_Column, paired = TRUE)
+print(t_test_result)
+
+
+
+## Aim 2 are there variation in traits in different regions
+# Compute mean Length and Width for each region
+mean_length_width <- alldata %>%
+  group_by(Region) %>%
+  summarize(mean_length = mean(Length, na.rm = TRUE),
+            mean_width = mean(Width, na.rm = TRUE))
+
+# View the resulting dataframe
+print(mean_length_width)
+
+
+library(stats)
+
+#ANOVA to test if there is a difference in length/widths in different regions
+anova_result <- aov(Length ~ Region, data = alldata)
+anova_result <- aov(Width ~ Region, data = alldata)
+print(summary(anova_result))
+
+# Perform Tukey post hoc test
+tukey_result <- TukeyHSD(anova_result)
+print(tukey_result)
+
+
+################################# GRAPHING ###############################
+# Load necessary library
+library(ggplot2)
+library(ggpubr)
+
+
+# length
+ggplot(alldata, aes(x = Region, y = Length)) +
+  geom_boxplot() +
+  labs(x = "Region", y = "Length (mm)") +
+  theme_minimal()
+
+
+
+# width
+ggplot(alldata, aes(x = Region, y = Width)) +
+  geom_boxplot() +
+  labs(x = "Region", y = "Width (mm)") +
+  theme_minimal()
+
+```
+
+
+
+
+```{r}
+
+library(dplyr)
+
+filtered_data <- subset(alldata, Unique_Regions >= 3)
+
+# Get unique families
+unique_families <- unique(filtered_data$Family)
+print(unique_families)
+
+# Group by Region and calculate the percentage of each trait
+trait_percentage <- alldata %>%
+  group_by(Region) %>%
+  summarise(Serrated = mean(Serrated) * 100,
+            Hairy = mean(Hairy) * 100,
+            Waxy = mean(Waxy) * 100,
+            Compound = mean(Compound) * 100,
+            Central = mean(Central) * 100)
+
+# Print the resulting table
+print(trait_percentage)
+
+
+############# graphing
+library(ggplot2)
+library(tidyr)
+
+# Reshape the data for plotting
+trait_percentage_long <- trait_percentage %>%
+  pivot_longer(cols = c(Serrated, Hairy, Waxy, Compound, Central),
+               names_to = "Trait",
+               values_to = "Percentage")
+
+# Create a bar chart
+ggplot(trait_percentage_long, aes(x = Region, y = Percentage, fill = Trait)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Trait Percentage by Region",
+       x = "Region",
+       y = "Percentage",
+       fill = "Trait") +
+  theme_minimal() +
+  theme(legend.position = "top")  # Move legend to the top
+
+
+
+# Create separate bar charts for each trait
+p1 <- ggplot(trait_percentage_long[trait_percentage_long$Trait == "Serrated", ], 
+             aes(x = Region, y = Percentage, fill = Trait)) +
+  geom_bar(stat = "identity", position = "dodge", fill = "skyblue") +
+  labs(x = "Region",
+       y = "Serrated (%)",
+       fill = "Trait") +
+  theme_minimal() +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))  # Remove legend
+
+p2 <- ggplot(trait_percentage_long[trait_percentage_long$Trait == "Hairy", ], 
+             aes(x = Region, y = Percentage, fill = Trait)) +
+  geom_bar(stat = "identity", position = "dodge", fill = "salmon") +
+  labs(x = "Region",
+       y = "Hairy (%)",
+       fill = "Trait") +
+  theme_minimal() +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))  # Remove legend
+
+p3 <- ggplot(trait_percentage_long[trait_percentage_long$Trait == "Waxy", ], 
+             aes(x = Region, y = Percentage, fill = Trait)) +
+  geom_bar(stat = "identity", position = "dodge", fill = "lightgreen") +
+  labs(x = "Region",
+       y = "Waxy (%)",
+       fill = "Trait") +
+  theme_minimal() +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))  # Remove legend
+
+p4 <- ggplot(trait_percentage_long[trait_percentage_long$Trait == "Compound", ], 
+             aes(x = Region, y = Percentage, fill = Trait)) +
+  geom_bar(stat = "identity", position = "dodge", fill = "orchid") +
+  labs(x = "Region",
+       y = "Compound (%)",
+       fill = "Trait") +
+  theme_minimal() +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))  # Remove legend
+
+p5 <- ggplot(trait_percentage_long[trait_percentage_long$Trait == "Central", ], 
+             aes(x = Region, y = Percentage, fill = Trait)) +
+  geom_bar(stat = "identity", position = "dodge", fill = "orange") +
+  labs(x = "Region",
+       y = "Central (%)",
+       fill = "Trait") +
+  theme_minimal() +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot the bar charts
+library(gridExtra)
+grid.arrange(p1, p2, p3, p4, p5, ncol = 3)
+
+print(p1)
+print(p2)
+print(p3)
+print(p4)
+print(p5)
+
+
+
+```
+
+
